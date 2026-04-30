@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { Hero } from './components/sections/Hero';
@@ -8,12 +8,53 @@ import { Reviews } from './components/sections/Reviews';
 import { VisitUs } from './components/sections/VisitUs';
 import { CartSidebar } from './components/ui/CartSidebar';
 import { MobileBottomBar } from './components/ui/MobileBottomBar';
-import { MAPS_DATA, PRODUCTS, REVIEWS } from './data/storeConfig';
+import { MAPS_DATA, REVIEWS } from './data/storeConfig';
 import type { Product, CartItem } from './data/storeConfig';
+import { supabase } from './lib/supabaseClient';
 
 export default function App() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [liveProducts, setLiveProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    const fetchLiveProducts = async () => {
+      try {
+        console.log("[PetShop] Fetching products from:", import.meta.env.VITE_SUPABASE_URL);
+        const { data, error } = await supabase
+          .from('ecommerce_products')
+          .select('*')
+          .eq('in_stock', true);
+        
+        console.log("[PetShop] Data:", data);
+        console.log("[PetShop] Error:", error);
+
+        if (error) {
+          console.error("[PetShop] Supabase Error:", error);
+          return;
+        }
+
+        if (data) {
+          console.log("[PetShop] Live Data Received:", data);
+          const mapped: Product[] = data.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: Number(item.price),
+            weight: item.weight || '',
+            category: item.category || '',
+            imageUrl: item.image_url || 'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=600&h=600&fit=crop&q=80',
+            isSubscriptionEligible: item.is_subscription,
+            subscriptionDiscount: 10
+          }));
+          setLiveProducts(mapped);
+        }
+      } catch (err) {
+        console.error("[PetShop] Critical Fetch Error:", err);
+      }
+    };
+
+    fetchLiveProducts();
+  }, []);
 
   const addToCart = (product: Product, isSubscription: boolean) => {
     setCart((prev) => {
@@ -56,7 +97,7 @@ export default function App() {
       <main className="flex-1">
         <Hero />
         <TrustBar />
-        <ProductGrid products={PRODUCTS} onAddToCart={addToCart} />
+        <ProductGrid products={liveProducts} onAddToCart={addToCart} />
         <Reviews reviews={REVIEWS} />
         <VisitUs mapData={MAPS_DATA} />
       </main>
